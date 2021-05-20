@@ -1,0 +1,351 @@
+---
+title: "Bibliometric analysis of publications in Plains Anthropologist from 2001-2020"
+author: "Robert Z. Selden, Jr."
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: github_document
+bibliography: book.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Bibliometrics
+
+The dataset used in this analysis was harvested from [Scopus](https://www.elsevier.com/solutions/scopus), includes all articles published in _Plains Anthropologist_ from 2001 - 2020, and was analysed using the `bibliometrix` package [@RN20997].
+
+```{r bibliometrix, echo=TRUE, warning=FALSE}
+# install bibliometrix and load data
+# devtools::install_github("massimoaria/bibliometrix")
+
+# load
+library(here)
+library(bibliometrix)
+library(reshape2)
+library(ggplot2)
+
+# data frame
+df <- convert2df(file = "scopus.bib", 
+                 dbsource = "scopus", 
+                 format = "bibtex")
+```
+
+## Descriptive analysis
+
+```{r summary, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+results <- biblioAnalysis(df, 
+                          sep = ";")
+options(width = 100)
+s <- summary(object = results, 
+             k = 20, 
+             pause = FALSE)
+
+# plot attributes
+plot(x = results, 
+     k = 20, 
+     pause = FALSE)
+```
+
+### Attributes of the local network
+
+```{r local.attr, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# calculate citations in local network
+CR <- localCitations(df, sep = ";")
+
+# top 20 cited authors in local network
+CR$Authors[1:20,]
+
+# top 20 cited papers in local network
+CR$Papers[1:20,]
+
+# top authors' productivity over time
+topAU <- authorProdOverTime(df, 
+                            k = 20, 
+                            graph = TRUE)
+```
+
+## Most cited
+
+### Most cited articles
+
+```{r most.cited.refs, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# most cited references in global network
+mcr <- citations(df, 
+                 field = "article", 
+                 sep = ";")
+cbind(mcr$Cited[1:20])
+```
+
+### Most cited authors
+
+```{r most.cited.auths, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# most cited authors in global network
+mcr <- citations(df, 
+                 field = "author", 
+                 sep = ";")
+cbind(mcr$Cited[1:20])
+```
+
+### Author dominance ranking
+
+```{r auth.dom, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+dom <- biblioAnalysis(df)
+dom.r <- dominance(dom)
+dom.r
+```
+
+## Intellectual structure
+
+### Author co-citation
+
+Co-citation analysis is the most commonly used bibliometric analysis method [@RN20999], and is defined as two publications that are cited together in one article [@RN21000].
+
+```{r auth.co.cite, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# extract author names from reference items
+df <- metaTagExtraction(df,
+                        Field = "CR_AU")
+
+# author co-citation network
+auth.co.mat <- biblioNetwork(df, 
+                             analysis = "co-citation", 
+                             network = "authors", 
+                             sep = ";")
+
+# network plot
+auth.co.net = networkPlot(auth.co.mat, 
+                          n = 50, 
+                          Title = "Author Co-Citation Network", 
+                          type = "auto", 
+                          size = 10, 
+                          size.cex = T, 
+                          remove.multiple = FALSE, 
+                          labelsize = 0.5, 
+                          edgesize = 8, 
+                          edges.min = 3, 
+                          remove.isolates = TRUE)
+
+# descriptive analysis of author co-citation network
+auth.co.netstat <- networkStat(auth.co.mat)
+summary(auth.co.netstat, k = 15)
+```
+
+### Author coupling
+
+Coupling is a similarity measure that uses citation analysis to illustrate a similarity relationship between documents. Author coupling occurs when two authors reference a common third author in their bibliographies.
+
+```{r auth.coup, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# author coupling network
+auth.coup.mat <- biblioNetwork(df, 
+                             analysis = "coupling", 
+                             network = "authors", 
+                             sep = ";")
+
+# network plot
+auth.coup.net = networkPlot(auth.coup.mat, 
+                          n = 50, 
+                          Title = "Author Coupling Network", 
+                          type = "mds", 
+                          size = 10, 
+                          size.cex = T,
+                          remove.multiple = FALSE, 
+                          labelsize = 0.5, 
+                          edgesize = 5, 
+                          edges.min = 8, 
+                          remove.isolates = TRUE)
+
+# descriptive analysis of author coupling network
+auth.coup.netstat <- networkStat(auth.coup.mat)
+summary(auth.coup.netstat, k = 15)
+```
+
+## Historiograph direct citation linkages
+
+The historiographic map is a chronological network map of the most relevant direct citations resulting from this bibliographic collection.
+
+```{r hdcn, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# historical citation network
+options(width = 100)
+histResults <- histNetwork(df, 
+                           min.citations = 25, 
+                           sep = ";")
+
+# plot historical co-citation network
+hnet <- histPlot(histResults, 
+                 n = 100, 
+                 size = 6, 
+                 labelsize = 2)
+```
+
+### Yearly occurrences of top keywords/terms
+
+#### Authors' keywords
+
+```{r key.growth, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+topKW = KeywordGrowth(df, 
+                      Tag = "DE", 
+                      sep = ";", 
+                      top = 10, 
+                      cdf = TRUE)
+
+topKW
+
+# plot results
+key.plot = melt(topKW, 
+                id ='Year')
+
+ggplot(key.plot, aes(Year, 
+                     value, 
+                     group = variable, 
+                     color = variable)) + 
+  geom_line()
+```
+
+## Conceptual structure
+
+### Co-word analysis
+
+The co-word analysis maps the conceptual structure of a research domain using the co-occurrence of author keywords in the bibliographic collection.
+
+#### Authors' keywords
+
+```{r co.word, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# using authors keywords
+cw <- conceptualStructure(df, 
+                          field = "DE", 
+                          method = "MDS", 
+                          minDegree = 2, 
+                          clust = "auto", 
+                          stemming = FALSE, 
+                          labelsize = 10, 
+                          documents = 50)
+```
+
+## Thematic mapping
+
+From [@RN20996, 150-151]:
+
+* Themes in the upper-right quadrant are both well developed and important for the structuring ofa research field. They are known as the motor-themes of the specialty, given that they present strong centrality and high density. The placement of themesin this quadrantimplies that theyare related externally to concepts applicable to otherthemesthat are conceptually closely related.
+* Themes in the upper-left quadrant have well developed internal ties but unimportant external ties and so are of only marginal importance for the field. These themes are very specialized and peripheral in character.
+* Themes in the lower-left quadrant are both weakly developed and marginal. The themes ofthis quadrant have low density and low centrality, mainly representing either emerging or disappearing themes.
+* Themes in the lower-right quadrant are important for a research field but are not developed. So, this quadrant groups transversal and general, basic themes.
+
+### Authors' keywords
+
+```{r thematic.map, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# keyword map
+map1 = thematicMap(df, 
+                   field = "DE", 
+                   n = 1000, 
+                   minfreq = 3, 
+                   stemming = FALSE, 
+                   size = 0.8, 
+                   n.labels = 1, 
+                   repel = TRUE)
+
+# plot map
+plot(map1$map)
+```
+
+## Social structure
+
+### Author collaboration 
+
+Scientific collaborations are plotted where nodes are authors and links are co-authorships, illustrating collaborations between authors.
+
+```{r auth.collab, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# author collaboration network
+auth.collab <- biblioNetwork(df, 
+                             analysis = "collaboration", 
+                             network = "authors", 
+                             sep = ";")
+
+# network plot
+auth.collabnet = networkPlot(auth.collab, 
+                             n = 100, 
+                             Title = "Author Collaboration", 
+                             type = "mds", 
+                             size = 20, 
+                             size.cex = T,
+                             edgesize = 2, 
+                             labelsize = 0.5,
+                             remove.multiple = TRUE,
+                             remove.isolates = TRUE)
+
+# descriptive analysis of author collaboration network
+auth.collab.netstat <- networkStat(auth.collab)
+summary(auth.collab.netstat, k = 15)
+```
+
+### Edu collaboration
+
+Scientific collaborations are plotted where nodes are institutions and links are co-authorships, illustrating collaborations between institutions.
+
+```{r edu.network, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE}
+# author collaboration network
+edu.collab <- biblioNetwork(df, 
+                            analysis = "collaboration", 
+                            network = "universities",
+                            sep = ";")
+
+# network plot
+edu.collabnet = networkPlot(edu.collab, 
+                            n = 100, 
+                            Title = "Edu Collaboration", 
+                            type = "auto", 
+                            size = 30, 
+                            size.cex = T, 
+                            edgesize = 2, 
+                            labelsize = 0.4, 
+                            remove.isolates = TRUE)
+
+# descriptive analysis of edu collaboration network
+edu.collab.netstat<-networkStat(edu.collab)
+summary(edu.collab.netstat, k = 15)
+```
+
+### Country collaboration
+
+```{r count.collab, out.width = "100%", dpi = 300, echo=TRUE, warning=FALSE, fig.cap="In this figure, scientific collaborations are plotted where nodes are countries and links are co-authorships, illustrating collaborations between countries"}
+# country collaboration network
+count <- metaTagExtraction(df, 
+                           Field = "AU_CO", 
+                           sep = ";")
+
+cmat1 <- biblioNetwork(count, 
+                       analysis = "collaboration", 
+                       network = "countries", 
+                       sep = ";")
+
+# network plot
+cnet1 = networkPlot(cmat1, 
+                    n = dim(cmat1)[1], 
+                    Title = "Country Collaboration", 
+                    type = "circle", 
+                    size = 10, 
+                    size.cex = T, 
+                    edgesize = 1, 
+                    labelsize = 0.6, 
+                    cluster = "none")
+
+# descriptive analysis of country collaboration network
+countnetstat <- networkStat(cmat1)
+summary(countnetstat, k = 15)
+```
+
+## Colophon
+
+This version of the analysis was generated on `r Sys.time()` using the following computational environment and dependencies: 
+
+```{r colophon, cache = FALSE}
+# what R packages and versions were used?
+if ("devtools" %in% installed.packages()) devtools::session_info()
+```
+
+Current Git commit details are:
+
+```{r}
+# where can I find this commit? 
+if ("git2r" %in% installed.packages() & git2r::in_repository(path = ".")) git2r::repository(here::here())  
+```
+
+## References cited
